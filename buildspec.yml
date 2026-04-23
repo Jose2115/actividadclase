@@ -1,0 +1,19 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.9
+    commands:
+      - pip install boto3
+  build:
+    commands:
+      - echo "Ejecutando script de carga..."
+      - python convertir.py
+  post_build:
+    commands:
+      - echo "Sincronizando el resultado con S3..."
+      - aws s3 cp index.html s3://NOMBRE-DE-TU-BUCKET-WEB/ 
+artifacts:
+  files:
+    - '**/*'
