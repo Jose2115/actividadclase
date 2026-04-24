@@ -5,15 +5,12 @@ phases:
       - pip3 install boto3
   build:
     commands:
-      - echo "Generando datos.json desde DynamoDB..."
-      # Ejecutamos el script para que cree el archivo datos.json localmente
-      - python3 generarweb.py
+      - echo "Validando generarweb.py..."
+      - python3 -c "import ast; ast.parse(open('generarweb.py').read()); print('Sintaxis OK')"
   post_build:
     commands:
-      - echo "Sincronizando index.html y datos.json con S3..."
-      # Subimos ambos archivos al bucket
+      - echo "Sincronizando con S3..."
       - aws s3 cp index.html s3://actividadclase/
-      - aws s3 cp datos.json s3://actividadclase/
 artifacts:
   files:
     - "**/*"
