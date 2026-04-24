@@ -13,7 +13,7 @@ phases:
   post_build:
     commands:
       - echo "Sincronizando el resultado con S3..."
-      - aws s3 cp index.html s3://NOMBRE-DE-TU-BUCKET-WEB/ 
+      - aws s3 cp index.html s3://actividadclase/ 
 artifacts:
   files:
     - '**/*'
