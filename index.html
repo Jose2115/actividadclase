@@ -4,59 +4,236 @@
   <meta charset="UTF-8">
   <title>Resultados del Pipeline</title>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 1100px; margin: 40px auto; background: #f4f6f8; }
-    h1   { color: #2c3e50; text-align: center; }
-    table { width: 100%; border-collapse: collapse; background: white; 
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
-    th   { background: #2c3e50; color: white; padding: 12px; text-align: center; }
-    td   { border: 1px solid #ddd; padding: 10px; text-align: center; }
-    tr:nth-child(even) { background: #f2f2f2; }
-    tr:hover { background: #d5e8f7; }
-    #estado { text-align: center; color: #27ae60; font-size: 16px; margin-bottom: 16px; }
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap');
+
+    :root {
+      --bg: #f0f2f5;
+      --card: #ffffff;
+      --header-bg: #1a2333;
+      --accent: #3b82f6;
+      --text: #1e293b;
+      --muted: #64748b;
+      --row-even: #f8fafc;
+      --row-hover: #dbeafe;
+      --border: #e2e8f0;
+      --success: #16a34a;
+      --error: #dc2626;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Mono', monospace;
+      background: var(--bg);
+      min-height: 100vh;
+      padding: 48px 24px;
+    }
+
+    .wrapper {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: clamp(1.4rem, 3vw, 2rem);
+      color: var(--text);
+      text-align: center;
+      letter-spacing: -0.5px;
+      margin-bottom: 8px;
+    }
+
+    #estado {
+      text-align: center;
+      font-size: 14px;
+      margin-bottom: 28px;
+      color: var(--muted);
+      min-height: 20px;
+    }
+    #estado.ok  { color: var(--success); }
+    #estado.err { color: var(--error); }
+
+    /* Upload area */
+    #upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      margin-bottom: 28px;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--card);
+    }
+    #upload-area:hover, #upload-area.drag { border-color: var(--accent); background: #eff6ff; }
+    #upload-area p { color: var(--muted); font-size: 14px; }
+    #upload-area strong { color: var(--accent); }
+    #file-input { display: none; }
+
+    /* Table */
+    .table-wrap {
+      background: var(--card);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+      display: none;
+    }
+    .table-wrap.visible { display: block; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    thead tr { background: var(--header-bg); }
+    th {
+      color: #fff;
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      padding: 14px 16px;
+      text-align: center;
+    }
+    td {
+      padding: 11px 16px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+    }
+    tbody tr:nth-child(even) td { background: var(--row-even); }
+    tbody tr:hover td { background: var(--row-hover); transition: background 0.15s; }
+    tbody tr:last-child td { border-bottom: none; }
+
+    .estado-name { font-weight: 500; }
+    .num { font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
+<div class="wrapper">
   <h1>📊 Resultados del Pipeline — Actividad por Estado</h1>
-  <p id="estado">Cargando datos...</p>
-  <table>
-    <thead>
-      <tr>
-        <th>Estado</th>
-        <th>Costo Alojamiento</th>
-        <th>Costo Transporte</th>
-        <th>Días Promedio</th>
-        <th>Humedad (%)</th>
-        <th>Temperatura (°C)</th>
-      </tr>
-    </thead>
-    <tbody id="tabla-body"></tbody>
-  </table>
+  <p id="estado">Selecciona tu archivo <code>datos.txt</code> para comenzar.</p>
 
-  <script>
-    fetch('datos.txt')
-      .then(r => r.txt())
-      .then(datos => {
-        document.getElementById('estado').textContent =
-          `✅ ${datos.length} estados cargados`;
+  <!-- Upload area -->
+  <div id="upload-area" onclick="document.getElementById('file-input').click()">
+    <input type="file" id="file-input" accept=".txt,.csv">
+    <p>🗂️ <strong>Haz clic aquí</strong> o arrastra tu archivo <strong>datos.txt</strong></p>
+    <p style="margin-top:6px;font-size:12px;">Formato esperado: CSV con encabezados (EstadoID, Costo_Alojamiento, Costo_Transporte, Dias_Promedio, Humedad, Temperatura)</p>
+  </div>
 
-        const tbody = document.getElementById('tabla-body');
-        datos
-          .sort((a, b) => a.EstadoID.localeCompare(b.EstadoID))
-          .forEach(e => {
-            tbody.innerHTML += `
-              <tr>
-                <td><b>${e.EstadoID}</b></td>
-                <td>$${Number(e.Costo_Alojamiento).toLocaleString()}</td>
-                <td>$${Number(e.Costo_Transporte).toLocaleString()}</td>
-                <td>${e.Dias_Promedio}</td>
-                <td>${e.Humedad}%</td>
-                <td>${e.Temperatura}°C</td>
-              </tr>`;
-          });
-      })
-      .catch(err => {
-        document.getElementById('estado').textContent = '❌ Error al cargar datos: ' + err;
+  <!-- Table -->
+  <div class="table-wrap" id="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Estado</th>
+          <th>Costo Alojamiento</th>
+          <th>Costo Transporte</th>
+          <th>Días Promedio</th>
+          <th>Humedad (%)</th>
+          <th>Temperatura (°C)</th>
+        </tr>
+      </thead>
+      <tbody id="tabla-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  const fileInput   = document.getElementById('file-input');
+  const uploadArea  = document.getElementById('upload-area');
+  const estadoEl    = document.getElementById('estado');
+  const tableWrap   = document.getElementById('table-wrap');
+  const tbody       = document.getElementById('tabla-body');
+
+  // Drag-and-drop visual feedback
+  uploadArea.addEventListener('dragover',  e => { e.preventDefault(); uploadArea.classList.add('drag'); });
+  uploadArea.addEventListener('dragleave', ()  => uploadArea.classList.remove('drag'));
+  uploadArea.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadArea.classList.remove('drag');
+    const file = e.dataTransfer.files[0];
+    if (file) processFile(file);
+  });
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) processFile(fileInput.files[0]);
+  });
+
+  function processFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => parseCSV(e.target.result);
+    reader.onerror = () => showError('No se pudo leer el archivo.');
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  function parseCSV(raw) {
+    try {
+      // Split lines and remove empty ones
+      const lines = raw.split(/\r?\n/).filter(l => l.trim() !== '');
+      if (lines.length < 2) throw new Error('El archivo no tiene datos suficientes.');
+
+      // Parse header row (first line)
+      const headers = lines[0].split(',').map(h => h.trim());
+
+      // Helper: get value by column name (case-insensitive, flexible)
+      const col = (row, name) => {
+        const idx = headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
+        return idx !== -1 ? (row[idx] || '').trim() : '';
+      };
+
+      // Parse data rows
+      const datos = lines.slice(1).map(line => {
+        const row = line.split(',');
+        return {
+          EstadoID:          col(row, 'EstadoID'),
+          Costo_Alojamiento: col(row, 'Costo_Alojamiento'),
+          Costo_Transporte:  col(row, 'Costo_Transporte'),
+          Dias_Promedio:     col(row, 'Dias_Promedio'),
+          Humedad:           col(row, 'Humedad'),
+          Temperatura:       col(row, 'Temperatura'),
+        };
+      }).filter(e => e.EstadoID !== ''); // skip blank rows
+
+      if (datos.length === 0) throw new Error('No se encontraron filas con datos.');
+
+      renderTable(datos);
+    } catch (err) {
+      showError(err.message);
+    }
+  }
+
+  function renderTable(datos) {
+    tbody.innerHTML = '';
+    datos
+      .sort((a, b) => a.EstadoID.localeCompare(b.EstadoID))
+      .forEach(e => {
+        tbody.innerHTML += `
+          <tr>
+            <td><span class="estado-name">${e.EstadoID}</span></td>
+            <td class="num">$${fmt(e.Costo_Alojamiento)}</td>
+            <td class="num">$${fmt(e.Costo_Transporte)}</td>
+            <td class="num">${e.Dias_Promedio}</td>
+            <td class="num">${e.Humedad}%</td>
+            <td class="num">${e.Temperatura}°C</td>
+          </tr>`;
       });
-  </script>
+
+    estadoEl.className = 'ok';
+    estadoEl.textContent = `✅ ${datos.length} estado(s) cargados correctamente`;
+    tableWrap.classList.add('visible');
+  }
+
+  function fmt(val) {
+    const n = Number(val);
+    return isNaN(n) ? val : n.toLocaleString('es-MX');
+  }
+
+  function showError(msg) {
+    estadoEl.className = 'err';
+    estadoEl.textContent = '❌ Error: ' + msg;
+    tableWrap.classList.remove('visible');
+  }
+</script>
 </body>
 </html>
