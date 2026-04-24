@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Resultados del Pipeline</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 1100px; margin: 40px auto; background: #f4f6f8; }
+    h1   { color: #2c3e50; text-align: center; }
+    table { width: 100%; border-collapse: collapse; background: white; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+    th   { background: #2c3e50; color: white; padding: 12px; text-align: center; }
+    td   { border: 1px solid #ddd; padding: 10px; text-align: center; }
+    tr:nth-child(even) { background: #f2f2f2; }
+    tr:hover { background: #d5e8f7; }
+    #estado { text-align: center; color: #27ae60; font-size: 16px; margin-bottom: 16px; }
+  </style>
+</head>
+<body>
+  <h1>📊 Resultados del Pipeline — Actividad por Estado</h1>
+  <p id="estado">Cargando datos...</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Estado</th>
+        <th>Costo Alojamiento</th>
+        <th>Costo Transporte</th>
+        <th>Días Promedio</th>
+        <th>Humedad (%)</th>
+        <th>Temperatura (°C)</th>
+      </tr>
+    </thead>
+    <tbody id="tabla-body"></tbody>
+  </table>
+
+  <script>
+    fetch('datos.json')
+      .then(r => r.json())
+      .then(datos => {
+        document.getElementById('estado').textContent =
+          `✅ ${datos.length} estados cargados`;
+
+        const tbody = document.getElementById('tabla-body');
+        datos
+          .sort((a, b) => a.EstadoID.localeCompare(b.EstadoID))
+          .forEach(e => {
+            tbody.innerHTML += `
+              <tr>
+                <td><b>${e.EstadoID}</b></td>
+                <td>$${Number(e.Costo_Alojamiento).toLocaleString()}</td>
+                <td>$${Number(e.Costo_Transporte).toLocaleString()}</td>
+                <td>${e.Dias_Promedio}</td>
+                <td>${e.Humedad}%</td>
+                <td>${e.Temperatura}°C</td>
+              </tr>`;
+          });
+      })
+      .catch(err => {
+        document.getElementById('estado').textContent = '❌ Error al cargar datos: ' + err;
+      });
+  </script>
+</body>
+</html>
