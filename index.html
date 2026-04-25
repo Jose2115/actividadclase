@@ -18,6 +18,8 @@
       --border: #e2e8f0;
       --success: #16a34a;
       --error: #dc2626;
+      --warn-bg: #fffbeb;
+      --warn-border: #fcd34d;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -29,10 +31,7 @@
       padding: 48px 24px;
     }
 
-    .wrapper {
-      max-width: 1100px;
-      margin: 0 auto;
-    }
+    .wrapper { max-width: 1100px; margin: 0 auto; }
 
     h1 {
       font-family: 'Syne', sans-serif;
@@ -47,21 +46,36 @@
     #estado {
       text-align: center;
       font-size: 14px;
-      margin-bottom: 28px;
+      margin-bottom: 16px;
       color: var(--muted);
       min-height: 20px;
     }
     #estado.ok  { color: var(--success); }
     #estado.err { color: var(--error); }
 
+    /* Debug box */
+    #debug {
+      display: none;
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 12px;
+      color: #92400e;
+      line-height: 1.7;
+    }
+    #debug.visible { display: block; }
+    #debug strong { display: block; margin-bottom: 4px; font-size: 13px; }
+
     /* Upload area */
     #upload-area {
       border: 2px dashed var(--border);
       border-radius: 12px;
-      padding: 32px;
+      padding: 28px;
       text-align: center;
       cursor: pointer;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
       transition: border-color 0.2s, background 0.2s;
       background: var(--card);
     }
@@ -80,10 +94,7 @@
     }
     .table-wrap.visible { display: block; }
 
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
+    table { width: 100%; border-collapse: collapse; }
     thead tr { background: var(--header-bg); }
     th {
       color: #fff;
@@ -104,20 +115,22 @@
     tbody tr:nth-child(even) td { background: var(--row-even); }
     tbody tr:hover td { background: var(--row-hover); transition: background 0.15s; }
     tbody tr:last-child td { border-bottom: none; }
-
-    .estado-name { font-weight: 500; }
     .num { font-variant-numeric: tabular-nums; }
+    .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
   </style>
 </head>
 <body>
 <div class="wrapper">
   <h1>📊 Resultados del Pipeline — Actividad por Estado</h1>
-  <p id="estado">Selecciona tu archivo <code>datos.txt</code> para comenzar.</p>
+  <p id="estado">Selecciona tu archivo <code>Estados.txt</code> para comenzar.</p>
+
+  <!-- Debug box -->
+  <div id="debug"></div>
 
   <!-- Upload area -->
   <div id="upload-area" onclick="document.getElementById('file-input').click()">
     <input type="file" id="file-input" accept=".txt,.csv">
-    <p>🗂️ <strong>Haz clic aquí</strong> o arrastra tu archivo <strong>datos.txt</strong></p>
+    <p>🗂️ <strong>Haz clic aquí</strong> o arrastra tu archivo <strong>Estados.txt</strong></p>
     <p style="margin-top:6px;font-size:12px;">Formato esperado: CSV con encabezados (EstadoID, Costo_Alojamiento, Costo_Transporte, Dias_Promedio, Humedad, Temperatura)</p>
   </div>
 
@@ -140,64 +153,105 @@
 </div>
 
 <script>
-  const fileInput   = document.getElementById('file-input');
-  const uploadArea  = document.getElementById('upload-area');
-  const estadoEl    = document.getElementById('estado');
-  const tableWrap   = document.getElementById('table-wrap');
-  const tbody       = document.getElementById('tabla-body');
+  const fileInput  = document.getElementById('file-input');
+  const uploadArea = document.getElementById('upload-area');
+  const estadoEl   = document.getElementById('estado');
+  const tableWrap  = document.getElementById('table-wrap');
+  const tbody      = document.getElementById('tabla-body');
+  const debugEl    = document.getElementById('debug');
 
-  // Drag-and-drop visual feedback
+  // Drag-and-drop
   uploadArea.addEventListener('dragover',  e => { e.preventDefault(); uploadArea.classList.add('drag'); });
   uploadArea.addEventListener('dragleave', ()  => uploadArea.classList.remove('drag'));
   uploadArea.addEventListener('drop', e => {
     e.preventDefault();
     uploadArea.classList.remove('drag');
-    const file = e.dataTransfer.files[0];
-    if (file) processFile(file);
+    if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
   });
-
   fileInput.addEventListener('change', () => {
     if (fileInput.files[0]) processFile(fileInput.files[0]);
   });
 
   function processFile(file) {
     const reader = new FileReader();
-    reader.onload = e => parseCSV(e.target.result);
+    reader.onload  = e => parseCSV(e.target.result);
     reader.onerror = () => showError('No se pudo leer el archivo.');
     reader.readAsText(file, 'UTF-8');
   }
 
+  // Map of aliases → canonical field name
+  // Agrega aquí cualquier variante que pueda tener tu archivo
+  const ALIAS = {
+    estadoid:          'EstadoID',
+    estado:            'EstadoID',
+    costo_alojamiento: 'Costo_Alojamiento',
+    costoalojamiento:  'Costo_Alojamiento',
+    alojamiento:       'Costo_Alojamiento',
+    costo_transporte:  'Costo_Transporte',
+    costotransporte:   'Costo_Transporte',
+    transporte:        'Costo_Transporte',
+    dias_promedio:     'Dias_Promedio',
+    diaspromedio:      'Dias_Promedio',
+    dias:              'Dias_Promedio',
+    humedad:           'Humedad',
+    temperatura:       'Temperatura',
+  };
+
+  function normalize(h) {
+    // quita espacios, tildes, convierte a minúsculas
+    return h.trim()
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, '_');
+  }
+
   function parseCSV(raw) {
+    debugEl.classList.remove('visible');
+    debugEl.innerHTML = '';
+
     try {
-      // Split lines and remove empty ones
       const lines = raw.split(/\r?\n/).filter(l => l.trim() !== '');
-      if (lines.length < 2) throw new Error('El archivo no tiene datos suficientes.');
+      if (lines.length < 2) throw new Error('El archivo tiene menos de 2 líneas.');
 
-      // Parse header row (first line)
-      const headers = lines[0].split(',').map(h => h.trim());
+      // Parse headers
+      const rawHeaders = lines[0].split(',');
+      const headers    = rawHeaders.map(h => h.trim());
+      const normHeaders = headers.map(normalize);
 
-      // Helper: get value by column name (case-insensitive, flexible)
-      const col = (row, name) => {
-        const idx = headers.findIndex(h => h.toLowerCase() === name.toLowerCase());
-        return idx !== -1 ? (row[idx] || '').trim() : '';
-      };
+      // Show detected headers in debug
+      showDebug(`Encabezados detectados: ${headers.join(' | ')}`);
 
-      // Parse data rows
+      // Build index map: canonical → column index
+      const idx = {};
+      normHeaders.forEach((nh, i) => {
+        const canonical = ALIAS[nh];
+        if (canonical) idx[canonical] = i;
+      });
+
+      // Check which required fields are missing
+      const required = ['EstadoID','Costo_Alojamiento','Costo_Transporte','Dias_Promedio','Humedad','Temperatura'];
+      const missing  = required.filter(f => idx[f] === undefined);
+      if (missing.length > 0) {
+        showDebug(`Columnas NO encontradas: ${missing.join(', ')}`);
+      }
+
+      // Parse rows
       const datos = lines.slice(1).map(line => {
-        const row = line.split(',');
-        return {
-          EstadoID:          col(row, 'EstadoID'),
-          Costo_Alojamiento: col(row, 'Costo_Alojamiento'),
-          Costo_Transporte:  col(row, 'Costo_Transporte'),
-          Dias_Promedio:     col(row, 'Dias_Promedio'),
-          Humedad:           col(row, 'Humedad'),
-          Temperatura:       col(row, 'Temperatura'),
-        };
-      }).filter(e => e.EstadoID !== ''); // skip blank rows
+        const cols = line.split(',');
+        const row  = {};
+        required.forEach(f => {
+          row[f] = idx[f] !== undefined ? (cols[idx[f]] || '').trim() : '—';
+        });
+        return row;
+      }).filter(e => e.EstadoID && e.EstadoID !== '—');
 
-      if (datos.length === 0) throw new Error('No se encontraron filas con datos.');
+      if (datos.length === 0) {
+        showDebug('Se leyó el archivo pero ninguna fila tenía un EstadoID válido.');
+        throw new Error('No se encontraron filas con datos. Revisa el cuadro amarillo arriba.');
+      }
 
       renderTable(datos);
+
     } catch (err) {
       showError(err.message);
     }
@@ -210,7 +264,7 @@
       .forEach(e => {
         tbody.innerHTML += `
           <tr>
-            <td><span class="estado-name">${e.EstadoID}</span></td>
+            <td><b>${e.EstadoID}</b></td>
             <td class="num">$${fmt(e.Costo_Alojamiento)}</td>
             <td class="num">$${fmt(e.Costo_Transporte)}</td>
             <td class="num">${e.Dias_Promedio}</td>
@@ -226,13 +280,18 @@
 
   function fmt(val) {
     const n = Number(val);
-    return isNaN(n) ? val : n.toLocaleString('es-MX');
+    return isNaN(n) ? (val || '—') : n.toLocaleString('es-MX');
   }
 
   function showError(msg) {
     estadoEl.className = 'err';
     estadoEl.textContent = '❌ Error: ' + msg;
     tableWrap.classList.remove('visible');
+  }
+
+  function showDebug(msg) {
+    debugEl.classList.add('visible');
+    debugEl.innerHTML += `<div>⚠️ ${msg}</div>`;
   }
 </script>
 </body>
