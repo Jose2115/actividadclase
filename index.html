@@ -18,8 +18,7 @@
       --border: #e2e8f0;
       --success: #16a34a;
       --error: #dc2626;
-      --warn-bg: #fffbeb;
-      --warn-border: #fcd34d;
+      --input-bg: #f8fafc;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -31,7 +30,7 @@
       padding: 48px 24px;
     }
 
-    .wrapper { max-width: 1100px; margin: 0 auto; }
+    .wrapper { max-width: 1150px; margin: 0 auto; }
 
     h1 {
       font-family: 'Syne', sans-serif;
@@ -40,59 +39,101 @@
       color: var(--text);
       text-align: center;
       letter-spacing: -0.5px;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
     }
 
     #estado {
       text-align: center;
-      font-size: 14px;
-      margin-bottom: 16px;
+      font-size: 13px;
+      margin-bottom: 24px;
       color: var(--muted);
-      min-height: 20px;
     }
     #estado.ok  { color: var(--success); }
     #estado.err { color: var(--error); }
 
-    /* Debug box */
-    #debug {
-      display: none;
-      background: var(--warn-bg);
-      border: 1px solid var(--warn-border);
-      border-radius: 8px;
-      padding: 12px 16px;
-      margin-bottom: 20px;
-      font-size: 12px;
-      color: #92400e;
-      line-height: 1.7;
+    .spinner {
+      display: inline-block;
+      width: 13px; height: 13px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 5px;
     }
-    #debug.visible { display: block; }
-    #debug strong { display: block; margin-bottom: 4px; font-size: 13px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Upload area */
-    #upload-area {
-      border: 2px dashed var(--border);
-      border-radius: 12px;
-      padding: 28px;
-      text-align: center;
-      cursor: pointer;
-      margin-bottom: 24px;
-      transition: border-color 0.2s, background 0.2s;
+    /* ── Filtros ─────────────────────────────────────── */
+    .filtros {
       background: var(--card);
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr 1fr;
+      gap: 16px;
     }
-    #upload-area:hover, #upload-area.drag { border-color: var(--accent); background: #eff6ff; }
-    #upload-area p { color: var(--muted); font-size: 14px; }
-    #upload-area strong { color: var(--accent); }
-    #file-input { display: none; }
 
-    /* Table */
+    .filtro-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .filtro-group label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .filtro-group input {
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 8px 10px;
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      color: var(--text);
+      background: var(--input-bg);
+      transition: border-color 0.2s;
+      width: 100%;
+    }
+    .filtro-group input:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: #fff;
+    }
+
+    .rango {
+      display: flex;
+      gap: 6px;
+    }
+    .rango input { width: 50%; }
+
+    .btn-limpiar {
+      grid-column: 1 / -1;
+      justify-self: end;
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 7px 16px;
+      font-family: 'DM Mono', monospace;
+      font-size: 12px;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-limpiar:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Tabla ────────────────────────────────────────── */
     .table-wrap {
       background: var(--card);
       border-radius: 12px;
       overflow: hidden;
       box-shadow: 0 2px 16px rgba(0,0,0,0.07);
-      display: none;
     }
-    .table-wrap.visible { display: block; }
 
     table { width: 100%; border-collapse: collapse; }
     thead tr { background: var(--header-bg); }
@@ -101,7 +142,7 @@
       font-family: 'Syne', sans-serif;
       font-size: 13px;
       font-weight: 700;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.4px;
       padding: 14px 16px;
       text-align: center;
     }
@@ -117,25 +158,64 @@
     tbody tr:last-child td { border-bottom: none; }
     .num { font-variant-numeric: tabular-nums; }
     .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+
+    /* highlight de búsqueda */
+    mark { background: #bfdbfe; color: var(--text); border-radius: 2px; padding: 0 2px; }
+
+    @media (max-width: 700px) {
+      .filtros { grid-template-columns: 1fr 1fr; }
+    }
   </style>
 </head>
 <body>
 <div class="wrapper">
   <h1>📊 Resultados del Pipeline — Actividad por Estado</h1>
-  <p id="estado">Selecciona tu archivo <code>Estados.txt</code> para comenzar.</p>
+  <p id="estado"><span class="spinner"></span> Cargando datos desde DynamoDB...</p>
 
-  <!-- Debug box -->
-  <div id="debug"></div>
+  <!-- Filtros -->
+  <div class="filtros">
+    <div class="filtro-group" style="grid-column: 1 / -1;">
+      <label>🔍 Buscar por Estado</label>
+      <input type="text" id="f-estado" placeholder="Ej: Jalisco, CDMX, Oaxaca...">
+    </div>
 
-  <!-- Upload area -->
-  <div id="upload-area" onclick="document.getElementById('file-input').click()">
-    <input type="file" id="file-input" accept=".txt,.csv">
-    <p>🗂️ <strong>Haz clic aquí</strong> o arrastra tu archivo <strong>Estados.txt</strong></p>
-    <p style="margin-top:6px;font-size:12px;">Formato esperado: CSV con encabezados (EstadoID, Costo_Alojamiento, Costo_Transporte, Dias_Promedio, Humedad, Temperatura)</p>
+    <div class="filtro-group">
+      <label>💰 Costo Alojamiento</label>
+      <div class="rango">
+        <input type="number" id="f-aloj-min" placeholder="Mín">
+        <input type="number" id="f-aloj-max" placeholder="Máx">
+      </div>
+    </div>
+
+    <div class="filtro-group">
+      <label>🚌 Costo Transporte</label>
+      <div class="rango">
+        <input type="number" id="f-transp-min" placeholder="Mín">
+        <input type="number" id="f-transp-max" placeholder="Máx">
+      </div>
+    </div>
+
+    <div class="filtro-group">
+      <label>🌡️ Temperatura (°C)</label>
+      <div class="rango">
+        <input type="number" id="f-temp-min" placeholder="Mín">
+        <input type="number" id="f-temp-max" placeholder="Máx">
+      </div>
+    </div>
+
+    <div class="filtro-group">
+      <label>💧 Humedad (%)</label>
+      <div class="rango">
+        <input type="number" id="f-hum-min" placeholder="Mín">
+        <input type="number" id="f-hum-max" placeholder="Máx">
+      </div>
+    </div>
+
+    <button class="btn-limpiar" onclick="limpiarFiltros()">✕ Limpiar filtros</button>
   </div>
 
-  <!-- Table -->
-  <div class="table-wrap" id="table-wrap">
+  <!-- Tabla -->
+  <div class="table-wrap">
     <table>
       <thead>
         <tr>
@@ -147,151 +227,115 @@
           <th>Temperatura (°C)</th>
         </tr>
       </thead>
-      <tbody id="tabla-body"></tbody>
+      <tbody id="tabla-body">
+        <tr><td colspan="6" class="empty">Cargando...</td></tr>
+      </tbody>
     </table>
   </div>
 </div>
 
 <script>
-  const fileInput  = document.getElementById('file-input');
-  const uploadArea = document.getElementById('upload-area');
-  const estadoEl   = document.getElementById('estado');
-  const tableWrap  = document.getElementById('table-wrap');
-  const tbody      = document.getElementById('tabla-body');
-  const debugEl    = document.getElementById('debug');
+  // ⚠️ CAMBIA ESTA URL por la de tu API Gateway
+  const API_URL = 'https://TU-API-GATEWAY-URL/estados';
 
-  // Drag-and-drop
-  uploadArea.addEventListener('dragover',  e => { e.preventDefault(); uploadArea.classList.add('drag'); });
-  uploadArea.addEventListener('dragleave', ()  => uploadArea.classList.remove('drag'));
-  uploadArea.addEventListener('drop', e => {
-    e.preventDefault();
-    uploadArea.classList.remove('drag');
-    if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
-  });
-  fileInput.addEventListener('change', () => {
-    if (fileInput.files[0]) processFile(fileInput.files[0]);
+  const estadoEl = document.getElementById('estado');
+  const tbody    = document.getElementById('tabla-body');
+
+  let todosLosDatos = []; // guardamos todos los datos en memoria
+
+  // ── Cargar datos al inicio ────────────────────────────
+  fetch(API_URL)
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+      return r.json();
+    })
+    .then(datos => {
+      if (typeof datos.body === 'string') datos = JSON.parse(datos.body);
+      if (!Array.isArray(datos)) throw new Error('Respuesta inesperada del servidor.');
+
+      todosLosDatos = datos.sort((a, b) =>
+        String(a.EstadoID).localeCompare(String(b.EstadoID))
+      );
+
+      estadoEl.className = 'ok';
+      estadoEl.textContent = `✅ ${todosLosDatos.length} estado(s) cargados`;
+      renderTabla(todosLosDatos);
+    })
+    .catch(err => {
+      estadoEl.className = 'err';
+      estadoEl.textContent = '❌ Error: ' + err.message;
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">No se pudieron cargar los datos.</td></tr>';
+    });
+
+  // ── Filtrado en tiempo real (client-side) ─────────────
+  const inputs = ['f-estado','f-aloj-min','f-aloj-max','f-transp-min','f-transp-max',
+                  'f-temp-min','f-temp-max','f-hum-min','f-hum-max'];
+  inputs.forEach(id => {
+    document.getElementById(id).addEventListener('input', aplicarFiltros);
   });
 
-  function processFile(file) {
-    const reader = new FileReader();
-    reader.onload  = e => parseCSV(e.target.result);
-    reader.onerror = () => showError('No se pudo leer el archivo.');
-    reader.readAsText(file, 'UTF-8');
+  function aplicarFiltros() {
+    const estado   = val('f-estado').toLowerCase();
+    const alojMin  = num('f-aloj-min');
+    const alojMax  = num('f-aloj-max');
+    const transpMin= num('f-transp-min');
+    const transpMax= num('f-transp-max');
+    const tempMin  = num('f-temp-min');
+    const tempMax  = num('f-temp-max');
+    const humMin   = num('f-hum-min');
+    const humMax   = num('f-hum-max');
+
+    const filtrados = todosLosDatos.filter(e => {
+      if (estado && !String(e.EstadoID).toLowerCase().includes(estado)) return false;
+      if (alojMin  !== null && +e.Costo_Alojamiento < alojMin)  return false;
+      if (alojMax  !== null && +e.Costo_Alojamiento > alojMax)  return false;
+      if (transpMin !== null && +e.Costo_Transporte < transpMin) return false;
+      if (transpMax !== null && +e.Costo_Transporte > transpMax) return false;
+      if (tempMin  !== null && +e.Temperatura < tempMin)  return false;
+      if (tempMax  !== null && +e.Temperatura > tempMax)  return false;
+      if (humMin   !== null && +e.Humedad < humMin)  return false;
+      if (humMax   !== null && +e.Humedad > humMax)  return false;
+      return true;
+    });
+
+    estadoEl.className = filtrados.length > 0 ? 'ok' : 'err';
+    estadoEl.textContent = filtrados.length > 0
+      ? `✅ ${filtrados.length} estado(s) encontrados`
+      : '⚠️ Ningún estado coincide con los filtros';
+
+    renderTabla(filtrados, estado);
   }
 
-  // Map of aliases → canonical field name
-  // Agrega aquí cualquier variante que pueda tener tu archivo
-  const ALIAS = {
-    estadoid:          'EstadoID',
-    estado:            'EstadoID',
-    costo_alojamiento: 'Costo_Alojamiento',
-    costoalojamiento:  'Costo_Alojamiento',
-    alojamiento:       'Costo_Alojamiento',
-    costo_transporte:  'Costo_Transporte',
-    costotransporte:   'Costo_Transporte',
-    transporte:        'Costo_Transporte',
-    dias_promedio:     'Dias_Promedio',
-    diaspromedio:      'Dias_Promedio',
-    dias:              'Dias_Promedio',
-    humedad:           'Humedad',
-    temperatura:       'Temperatura',
-  };
-
-  function normalize(h) {
-    // quita espacios, tildes, convierte a minúsculas
-    return h.trim()
-      .toLowerCase()
-      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, '_');
-  }
-
-  function parseCSV(raw) {
-    debugEl.classList.remove('visible');
-    debugEl.innerHTML = '';
-
-    try {
-      const lines = raw.split(/\r?\n/).filter(l => l.trim() !== '');
-      if (lines.length < 2) throw new Error('El archivo tiene menos de 2 líneas.');
-
-      // Parse headers
-      const rawHeaders = lines[0].split(',');
-      const headers    = rawHeaders.map(h => h.trim());
-      const normHeaders = headers.map(normalize);
-
-      // Show detected headers in debug
-      showDebug(`Encabezados detectados: ${headers.join(' | ')}`);
-
-      // Build index map: canonical → column index
-      const idx = {};
-      normHeaders.forEach((nh, i) => {
-        const canonical = ALIAS[nh];
-        if (canonical) idx[canonical] = i;
-      });
-
-      // Check which required fields are missing
-      const required = ['EstadoID','Costo_Alojamiento','Costo_Transporte','Dias_Promedio','Humedad','Temperatura'];
-      const missing  = required.filter(f => idx[f] === undefined);
-      if (missing.length > 0) {
-        showDebug(`Columnas NO encontradas: ${missing.join(', ')}`);
-      }
-
-      // Parse rows
-      const datos = lines.slice(1).map(line => {
-        const cols = line.split(',');
-        const row  = {};
-        required.forEach(f => {
-          row[f] = idx[f] !== undefined ? (cols[idx[f]] || '').trim() : '—';
-        });
-        return row;
-      }).filter(e => e.EstadoID && e.EstadoID !== '—');
-
-      if (datos.length === 0) {
-        showDebug('Se leyó el archivo pero ninguna fila tenía un EstadoID válido.');
-        throw new Error('No se encontraron filas con datos. Revisa el cuadro amarillo arriba.');
-      }
-
-      renderTable(datos);
-
-    } catch (err) {
-      showError(err.message);
+  function renderTabla(datos, busqueda = '') {
+    if (datos.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="empty">Sin resultados para los filtros aplicados.</td></tr>';
+      return;
     }
+    tbody.innerHTML = datos.map(e => `
+      <tr>
+        <td><b>${highlight(String(e.EstadoID ?? '—'), busqueda)}</b></td>
+        <td class="num">$${fmt(e.Costo_Alojamiento)}</td>
+        <td class="num">$${fmt(e.Costo_Transporte)}</td>
+        <td class="num">${e.Dias_Promedio ?? '—'}</td>
+        <td class="num">${e.Humedad ?? '—'}%</td>
+        <td class="num">${e.Temperatura ?? '—'}°C</td>
+      </tr>`).join('');
   }
 
-  function renderTable(datos) {
-    tbody.innerHTML = '';
-    datos
-      .sort((a, b) => a.EstadoID.localeCompare(b.EstadoID))
-      .forEach(e => {
-        tbody.innerHTML += `
-          <tr>
-            <td><b>${e.EstadoID}</b></td>
-            <td class="num">$${fmt(e.Costo_Alojamiento)}</td>
-            <td class="num">$${fmt(e.Costo_Transporte)}</td>
-            <td class="num">${e.Dias_Promedio}</td>
-            <td class="num">${e.Humedad}%</td>
-            <td class="num">${e.Temperatura}°C</td>
-          </tr>`;
-      });
-
+  function limpiarFiltros() {
+    inputs.forEach(id => document.getElementById(id).value = '');
     estadoEl.className = 'ok';
-    estadoEl.textContent = `✅ ${datos.length} estado(s) cargados correctamente`;
-    tableWrap.classList.add('visible');
+    estadoEl.textContent = `✅ ${todosLosDatos.length} estado(s) cargados`;
+    renderTabla(todosLosDatos);
   }
 
-  function fmt(val) {
-    const n = Number(val);
-    return isNaN(n) ? (val || '—') : n.toLocaleString('es-MX');
-  }
-
-  function showError(msg) {
-    estadoEl.className = 'err';
-    estadoEl.textContent = '❌ Error: ' + msg;
-    tableWrap.classList.remove('visible');
-  }
-
-  function showDebug(msg) {
-    debugEl.classList.add('visible');
-    debugEl.innerHTML += `<div>⚠️ ${msg}</div>`;
+  // ── Utilidades ────────────────────────────────────────
+  function val(id) { return document.getElementById(id).value.trim(); }
+  function num(id) { const v = val(id); return v === '' ? null : parseFloat(v); }
+  function fmt(v)  { const n = Number(v); return isNaN(n) ? (v ?? '—') : n.toLocaleString('es-MX'); }
+  function highlight(text, query) {
+    if (!query) return text;
+    return text.replace(new RegExp(`(${query})`, 'gi'), '<mark>$1</mark>');
   }
 </script>
 </body>
