@@ -1,14 +1,13 @@
 import json
 import boto3
 from decimal import Decimal
+from boto3.dynamodb.conditions import Key, Attr
 
-# ⚠️ Cambia la región si es diferente a us-east-1
-dynamodb = boto3.resource('dynamodb', region_name='us-east-1')
+dynamodb = boto3.resource('dynamodb', region_name='us-east-1')  # ← cambia tu región si es diferente
 tabla    = dynamodb.Table('actividadestados')
 
 
 def decimal_a_float(obj):
-    """Convierte Decimal a float para que json.dumps pueda serializarlo."""
     if isinstance(obj, Decimal):
         return float(obj)
     raise TypeError
@@ -16,9 +15,8 @@ def decimal_a_float(obj):
 
 def lambda_handler(event, context):
     try:
-        # Obtener parámetros de búsqueda opcionales desde query string
         params       = event.get('queryStringParameters') or {}
-        estado_query = params.get('estado', '').strip().lower()
+        estado_query = params.get('estado', '').strip()
         min_aloj     = params.get('min_aloj')
         max_aloj     = params.get('max_aloj')
         min_transp   = params.get('min_transp')
@@ -28,43 +26,30 @@ def lambda_handler(event, context):
         min_hum      = params.get('min_hum')
         max_hum      = params.get('max_hum')
 
-        # Escanear toda la tabla (con paginación automática)
-        respuesta = tabla.scan()
-        items     = respuesta['Items']
-        while 'LastEvaluatedKey' in respuesta:
-            respuesta = tabla.scan(ExclusiveStartKey=respuesta['LastEvaluatedKey'])
-            items.extend(respuesta['Items'])
+        hay_filtros_numericos = any([min_aloj, max_aloj, min_transp, max_transp,
+                                     min_temp, max_temp, min_hum, max_hum])
 
-        # ── Filtros aplicados en Python ──────────────────────────────────────
+        # ── CASO 1: Búsqueda exacta por clave de partición (EstadoID) ────────
+        # Si el usuario escribió un estado completo y sin filtros numéricos,
+        # usamos get_item (más rápido y eficiente)
+        if estado_query and not hay_filtros_numericos:
+            respuesta = tabla.get_item(Key={'EstadoID': estado_query})
+            item = respuesta.get('Item')
+            if item:
+                items = [item]
+            else:
+                # Si no coincidió exacto, hacemos scan parcial
+                items = scan_con_filtros(estado_query, min_aloj, max_aloj,
+                                         min_transp, max_transp,
+                                         min_temp, max_temp,
+                                         min_hum, max_hum)
 
-        # Filtro por nombre de estado (búsqueda parcial, sin importar mayúsculas)
-        if estado_query:
-            items = [i for i in items
-                     if estado_query in str(i.get('EstadoID', '')).lower()]
-
-        # Filtro por rango de Costo_Alojamiento
-        if min_aloj:
-            items = [i for i in items if float(i.get('Costo_Alojamiento', 0)) >= float(min_aloj)]
-        if max_aloj:
-            items = [i for i in items if float(i.get('Costo_Alojamiento', 0)) <= float(max_aloj)]
-
-        # Filtro por rango de Costo_Transporte
-        if min_transp:
-            items = [i for i in items if float(i.get('Costo_Transporte', 0)) >= float(min_transp)]
-        if max_transp:
-            items = [i for i in items if float(i.get('Costo_Transporte', 0)) <= float(max_transp)]
-
-        # Filtro por rango de Temperatura
-        if min_temp:
-            items = [i for i in items if float(i.get('Temperatura', 0)) >= float(min_temp)]
-        if max_temp:
-            items = [i for i in items if float(i.get('Temperatura', 0)) <= float(max_temp)]
-
-        # Filtro por rango de Humedad
-        if min_hum:
-            items = [i for i in items if float(i.get('Humedad', 0)) >= float(min_hum)]
-        if max_hum:
-            items = [i for i in items if float(i.get('Humedad', 0)) <= float(max_hum)]
+        # ── CASO 2: Filtros numéricos o búsqueda parcial → scan con filtros ──
+        else:
+            items = scan_con_filtros(estado_query, min_aloj, max_aloj,
+                                     min_transp, max_transp,
+                                     min_temp, max_temp,
+                                     min_hum, max_hum)
 
         # Ordenar por EstadoID
         items.sort(key=lambda x: str(x.get('EstadoID', '')))
@@ -85,3 +70,54 @@ def lambda_handler(event, context):
             'headers': {'Access-Control-Allow-Origin': '*'},
             'body': json.dumps({'error': str(e)})
         }
+
+
+def scan_con_filtros(estado_query, min_aloj, max_aloj,
+                     min_transp, max_transp,
+                     min_temp, max_temp,
+                     min_hum, max_hum):
+    """
+    Escanea la tabla aplicando FilterExpression en DynamoDB.
+    Más eficiente que traer todo y filtrar en Python.
+    """
+    filtros = []
+
+    # Búsqueda parcial por EstadoID (contains)
+    if estado_query:
+        filtros.append(Attr('EstadoID').contains(estado_query))
+
+    # Rangos numéricos
+    if min_aloj:
+        filtros.append(Attr('Costo_Alojamiento').gte(Decimal(min_aloj)))
+    if max_aloj:
+        filtros.append(Attr('Costo_Alojamiento').lte(Decimal(max_aloj)))
+    if min_transp:
+        filtros.append(Attr('Costo_Transporte').gte(Decimal(min_transp)))
+    if max_transp:
+        filtros.append(Attr('Costo_Transporte').lte(Decimal(max_transp)))
+    if min_temp:
+        filtros.append(Attr('Temperatura').gte(Decimal(min_temp)))
+    if max_temp:
+        filtros.append(Attr('Temperatura').lte(Decimal(max_temp)))
+    if min_hum:
+        filtros.append(Attr('Humedad').gte(Decimal(min_hum)))
+    if max_hum:
+        filtros.append(Attr('Humedad').lte(Decimal(max_hum)))
+
+    # Combinar todos los filtros con AND
+    if filtros:
+        expresion = filtros[0]
+        for f in filtros[1:]:
+            expresion = expresion & f
+        kwargs = {'FilterExpression': expresion}
+    else:
+        kwargs = {}
+
+    # Escanear con paginación automática
+    respuesta = tabla.scan(**kwargs)
+    items = respuesta['Items']
+    while 'LastEvaluatedKey' in respuesta:
+        respuesta = tabla.scan(ExclusiveStartKey=respuesta['LastEvaluatedKey'], **kwargs)
+        items.extend(respuesta['Items'])
+
+    return items
